@@ -16,7 +16,7 @@ dependencies:
 $(BINARY): $(SOURCES)
 	env GOAMD64=v2 \
 		CGO_ENABLED=1 \
-	go build $(BUILD_OPTIONS) .
+	go build -o $(BINARY) $(BUILD_OPTIONS) .
 
 tagpush: all
 	./bin/stepup_tag.sh
