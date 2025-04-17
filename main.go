@@ -2,12 +2,16 @@ package main
 
 import (
 	"bufio"
+	"crypto/x509"
+	"encoding/pem"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"regexp"
 	"strings"
+	"time"
+	"path/filepath"
 )
 
 const (
@@ -35,17 +39,28 @@ func main() {
 	}
 
 	if *domain == "" {
-		fmt.Println("Checking all domains.")
+		// fmt.Println("Checking all domains.")
 		CheckAllDomains = true
 	}
 
 	if CheckAllDomains {
 		configFiles := getListOfConfigs(fmt.Sprintf("%s/renewal", *letsencryptdir))
-		fmt.Println("configFiles:", configFiles)
+		// fmt.Println("configFiles:", configFiles)
+		for _, config := range configFiles {
+			config = fmt.Sprintf("%s/renewal/%s", *letsencryptdir, config)
+			cert := getCertificatePathFromConfig(config)
+			certX509 := getCertificateX509(cert)
+			days := getRemainingDays(certX509)
+			domain := getDomainNameFromConfigFile(config)
+			printRemainingDays(domain, days)
+		}
 	} else {
 		configFile := fmt.Sprintf("%s/renewal/%s.conf", *letsencryptdir, *domain)
 		certificate := getCertificatePathFromConfig(configFile)
-		fmt.Println("certificate:", certificate)
+		// fmt.Println("certificate:", certificate)
+		certX509 := getCertificateX509(certificate)
+		days := getRemainingDays(certX509)
+		printRemainingDays(*domain, days)
 
 	}
 
@@ -98,4 +113,47 @@ func getCertificatePathFromConfig(configFile string) string {
 
 func sed(before, after, text string) string {
 	return strings.Replace(text, before, after, -1)
+}
+
+func getCertificateX509(certificate string) *x509.Certificate {
+	file, err := os.Open(certificate)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to open file: %v", certificate))
+	}
+	defer file.Close()
+	rd := bufio.NewReader(file)
+	// 8192 is a good number?
+	text := make([]byte, 8192)
+	counter, err := rd.Read(text)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to read file: %v", certificate))
+	}
+	if counter == 0 {
+		panic(fmt.Sprintf("Failed to read file (counter is zero): %v", certificate))
+	}
+	certPEM, _ := pem.Decode(text)
+	if certPEM == nil {
+		panic(fmt.Sprintf("Failed to decode PEM from file: %v", certificate))
+	}
+	cert, err := x509.ParseCertificate(certPEM.Bytes)
+		if certPEM == nil {
+		panic(fmt.Sprintf("Failed to parse as X509 from file: %v", certificate))
+	}
+
+	return cert
+}
+
+func getRemainingDays(cert *x509.Certificate) string {
+	expiration := cert.NotAfter
+	remaining := expiration.Sub(time.Now())
+	return fmt.Sprintf("%d", int(remaining.Hours()/24))
+}
+
+func printRemainingDays(domain , days string) {
+	fmt.Printf("%s=%s\n", domain, days)
+}
+
+func getDomainNameFromConfigFile(config string) string {
+	fileName := filepath.Base(config)
+	return sed(".conf", "", fileName)
 }

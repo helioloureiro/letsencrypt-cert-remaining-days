@@ -10,6 +10,9 @@ BUILD_OPTIONS += -trimpath
 
 all: $(SOURCES) dependencies $(BINARY)
 
+test:
+	go test -v ./...
+
 dependencies:
 	go mod tidy
 

@@ -2,6 +2,8 @@ package main
 
 import (
 	"testing"
+	"crypto/x509"
+	"encoding/pem"
 )
 
 
@@ -33,3 +35,4 @@ func TestSed(t *testing.T) {
 		t.Errorf("Expected: %s - got: %s", expected, response)
 	}
 }
+
